@@ -14,7 +14,7 @@ provider "azurerm" {
 
 resource "azurerm_resource_group" "demo" {
   name     = "rg-demo-kd"
-  location = "West Europe"
+  location = "norwayeast"
 }
 
 resource "azurerm_storage_account" "demo" {
