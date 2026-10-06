@@ -61,15 +61,16 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      # K5: parameterverdiene hentes fra Key Vault under kjøring, ikke fra en
-      # .tfvars-fil i repoet. Navnet params.auto.tfvars er ikke tilfeldig -
-      # alt som heter *.auto.tfvars leses automatisk av Terraform.
+      
       - name: Hent parameterfila fra Key Vault
         run: |
           az keyvault secret show \
             --vault-name "${{ secrets.KEYVAULT_NAME }}" \
             --name "tfvars-$MILJO" \
             --query value -o tsv > params.auto.tfvars
+            
+      - name: Midlertidig – hva havner i loggen?
+        run: echo "location er $(grep location params.auto.tfvars)"
 
       - name: Init
         run: |
