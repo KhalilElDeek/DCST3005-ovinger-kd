@@ -28,3 +28,4 @@ module "network" {
   subnets   = var.subnets
   tags      = local.tags
 }
+# trigger K8/K9-sjekk
