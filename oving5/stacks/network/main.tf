@@ -7,7 +7,7 @@ locals {
     environment = var.environment
     owner       = var.owner
     project     = var.project_name
-    stack       = "nettverk"
+    stack       = "network"
     managedby   = "terraform"
   }
 }
