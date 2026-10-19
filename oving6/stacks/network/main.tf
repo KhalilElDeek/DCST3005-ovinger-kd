@@ -9,6 +9,7 @@ locals {
     project     = var.project_name
     stack       = "network"
     managedby   = "terraform"
+    kurs        = "dcst3005"
   }
 }
 
