@@ -3,7 +3,7 @@
 locals {
   base_name = lower(format("%s-%s-%s", var.project_name, var.environment, var.owner))
 
-  tags = {
+        tags = {
     environment = var.environment
     owner       = var.owner
     project     = var.project_name
