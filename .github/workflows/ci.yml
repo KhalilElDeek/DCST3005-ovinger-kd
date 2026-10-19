@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  kontroll:
+    name: fmt og validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: terraform fmt -check
+        working-directory: oving6
+        run: terraform fmt -check -recursive
+
+      - name: terraform init (uten backend)
+        working-directory: oving6/stacks/network
+        run: terraform init -backend=false
+
+      - name: terraform validate
+        working-directory: oving6/stacks/network
+        run: terraform validate
