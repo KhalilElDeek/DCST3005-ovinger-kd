@@ -1,0 +1,38 @@
+name: CI (oving7)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'oving7/**'
+      - '.github/workflows/ci-oving7.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  kontroll:
+    name: kodekontroll
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Installer TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.64.0
+
+      - name: Installer Checkov
+        run: pip install checkov==3.3.21
+
+      - name: Kjør valider.sh
+        run: bash oving7/scripts/valider.sh
