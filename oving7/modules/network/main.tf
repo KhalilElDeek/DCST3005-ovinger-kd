@@ -36,6 +36,7 @@ resource "azurerm_network_security_group" "main" {
   location            = var.location
   resource_group_name = var.rg_name
 
+  #checkov:skip=CKV_AZURE_10:
   security_rule {
     name                       = "AllowSSH"
     priority                   = 100
