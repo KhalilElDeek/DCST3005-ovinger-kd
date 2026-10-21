@@ -3,9 +3,6 @@ name: CI (oving7)
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'oving7/**'
-      - '.github/workflows/ci-oving7.yml'
 
 permissions:
   contents: read
