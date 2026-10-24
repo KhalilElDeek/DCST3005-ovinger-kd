@@ -1,0 +1,115 @@
+# =============================================================================
+# drift-oving8.yml - har dev glidd fra koden?
+# -----------------------------------------------------------------------------
+# Kjører terraform plan mot dev på et fast tidspunkt og blir RØD hvis Azure
+# ikke stemmer med koden på main. Den retter ingenting - den melder fra.
+#
+# Husk hva den ikke ser: ressurser som ikke står i state, og egenskaper
+# koden ikke nevner. Grønn betyr «det Terraform eier, stemmer» - ikke
+# «alt i Azure er som det skal».
+# =============================================================================
+name: Drift dev (oving8)
+
+on:
+  schedule:
+    # 11.00 UTC mandag-fredag: etter at dev er rullet ut, lenge før en
+    # eventuell nattlig ryddejobb.
+    - cron: '0 11 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  sjekk:
+    name: drift-sjekk dev
+    runs-on: ubuntu-latest
+    environment: dev
+
+    defaults:
+      run:
+        working-directory: oving8/stacks/network
+
+    steps:
+      - name: Hent koden
+        uses: actions/checkout@v4
+
+      - name: Installer Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Logg inn i Azure
+        uses: Azure/login@v3.1.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Hent parameterfila for dev
+        run: |
+          az keyvault secret show \
+            --vault-name "${{ secrets.KEYVAULT_NAME }}" \
+            --name "tfvars-oving8-dev" \
+            --query value -o tsv > params.auto.tfvars
+
+      - name: Init
+        run: |
+          terraform init \
+            -backend-config="${{ github.workspace }}/oving8/shared/backend.hcl" \
+            -backend-config="key=env/dev/oving8-network.tfstate"
+
+      # Kjernen i hele workflowen. Tre detaljer, alle med vilje:
+      #   set +e        - ellers stopper steget ved exit-kode 2 (bash -e)
+      #   > fil         - IKKE en pipe; da ville vi fått exit-koden til en
+      #                   annen kommando i stedet for terraform sin egen
+      #   -lock=false   - planen skriver ingenting og skal ikke blokkere
+      #                   en samtidig CD dev-kjøring
+      - name: Plan med detaljert exit-kode
+        id: plan
+        run: |
+          set +e
+          terraform plan -lock=false -no-color -detailed-exitcode > plan.txt 2>&1
+          kode=$?
+          set -e
+          cat plan.txt
+          echo "kode=$kode" >> "$GITHUB_OUTPUT"
+
+      - name: Slett parameterfila
+        if: always()
+        run: rm -f params.auto.tfvars
+
+      # Sammendraget havner øverst på kjøringen. Det er det du leser først.
+      - name: Skriv sammendrag
+        if: always()
+        env:
+          KODE: ${{ steps.plan.outputs.kode }}
+        run: |
+          {
+            case "$KODE" in
+              0) echo "## ✅ Ingen drift i dev" ;;
+              2) echo "## ⚠️ Drift i dev – Azure stemmer ikke med main" ;;
+              *) echo "## ❌ Drift-sjekken feilet – se loggen" ;;
+            esac
+            echo
+            grep -E '^(Plan:|No changes)' plan.txt || true
+            echo
+            echo "<details><summary>Hele planen</summary>"
+            echo
+            echo '```text'
+            cat plan.txt 2>/dev/null || true
+            echo '```'
+            echo
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Til slutt: gjør jobben rød hvis det var drift (2) eller feil (1).
+      - name: Rød ved drift
+        env:
+          KODE: ${{ steps.plan.outputs.kode }}
+        run: |
+          if [ "$KODE" != "0" ]; then
+            echo "::error::Drift-sjekken ga exit-kode $KODE – se sammendraget."
+            exit 1
+          fi
