@@ -5,10 +5,10 @@ output "resource_group_name" {
 
 output "vnet_name" {
   description = "Navnet på virtual network, videreformidlet fra modulen."
-  value       = module.network.vnet_name
+  value       = module.nett.vnet_name
 }
 
 output "subnet_ids" {
   description = "Map: subnett-navn => subnett-ID, videreformidlet fra modulen."
-  value       = module.network.subnet_ids
+  value       = module.nett.subnet_ids
 }
