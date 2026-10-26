@@ -1,4 +1,4 @@
-name: CD dev
+name: CD dev (oving8)
 run-name: dev ← ${{ github.sha }}
 
 on:
