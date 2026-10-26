@@ -1,4 +1,4 @@
-name: CD test
+name: CD test (oving8)
 run-name: test ← ${{ inputs.sha }}
 
 on:

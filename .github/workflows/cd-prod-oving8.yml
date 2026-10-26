@@ -1,4 +1,4 @@
-name: CD prod
+name: CD prod (oving8)
 run-name: prod ← ${{ inputs.sha }}
 
 on:

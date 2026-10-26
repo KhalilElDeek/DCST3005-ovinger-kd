@@ -1,43 +1,54 @@
-name: Roll out network
+name: Destroy network (oving5)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'oving5/stacks/network/**'
-      - 'oving5/modules/network/**'
-      - 'oving5/shared/backend.hcl'
-      - '.github/workflows/deploy-network.yml'
-
   workflow_dispatch:
     inputs:
       environment:
-        description: Miljø - gjelder bare ved manuell kjøring
+        description: Miljø som skal rives ned
         type: choice
         options: [dev, test]
-        default: dev
+        required: true
+      bekreftelse:
+        description: 'Skriv "riv ned <miljø>" for å bekrefte'
+        type: string
+        required: true
 
 permissions:
   id-token: write
   contents: read
 
-# K9: push kjører ALLTID dette workflow_run uten inputs - uttrykket under
-# faller da tilbake på 'dev'. Det finnes ingen vei fra en push til test.
 concurrency:
-  group: network-${{ inputs.environment || 'dev' }}
+  group: network-${{ inputs.environment }}
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  # K10: egen jobb, uten environment: eller id-token: write - den kan ikke
+  # nå Azure i det hele tatt, uansett hva som skjer her.
+  bekreft:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || 'dev' }}
+    steps:
+      - name: Sjekk bekreftelsen
+        env:
+          BEKREFTELSE: ${{ inputs.bekreftelse }}
+          MILJO: ${{ inputs.environment }}
+        run: |
+          if [ "$BEKREFTELSE" != "riv ned $MILJO" ]; then
+            echo "::error::Ikke bekreftet. Forventet nøyaktig: riv ned $MILJO"
+            exit 1
+          fi
+          echo "Bekreftet."
+
+  riv-ned:
+    needs: bekreft
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
 
     defaults:
       run:
         working-directory: oving5/stacks/network
 
     env:
-      MILJO: ${{ inputs.environment || 'dev' }}
+      MILJO: ${{ inputs.environment }}
       ARM_USE_OIDC: true
       ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -61,9 +72,6 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      # K5: parameterverdiene hentes fra Key Vault under kjøring, ikke fra en
-      # .tfvars-fil i repoet. Navnet params.auto.tfvars er ikke tilfeldig -
-      # alt som heter *.auto.tfvars leses automatisk av Terraform.
       - name: Hent parameterfila fra Key Vault
         run: |
           az keyvault secret show \
@@ -77,25 +85,17 @@ jobs:
             -backend-config="${{ github.workspace }}/oving5/shared/backend.hcl" \
             -backend-config="key=env/$MILJO/network.tfstate"
 
-      - name: Validate
-        run: terraform validate
+      # plan-destroy + apply i stedet for et rått "terraform destroy" -
+      # samme disiplin som ved utrulling, brukt på den farligste operasjonen.
+      - name: Lag en destroy-plan
+        run: terraform plan -destroy -out=tfdestroy
 
-      - name: Plan
-        run: terraform plan
+      - name: Utfør destroy-planen
+        run: terraform apply tfdestroy
 
-      - name: Apply
-        run: terraform apply -auto-approve
+      - name: Verifiser at det er tomt
+        run: terraform state list
 
-      - name: Verifiser at networket finnes i Azure
-        run: |
-          RG=$(terraform output -raw resource_group_name)
-          VNET=$(terraform output -raw vnet_name)
-          STATE=$(az network vnet show --resource-group "$RG" --name "$VNET" \
-                    --query provisioningState -o tsv)
-          echo "$VNET i $RG: $STATE"
-          test "$STATE" = "Succeeded"
-
-      # K5: slettes igjen, også når apply feilet - if: always()
       - name: Slett parameterfila
         if: always()
         run: rm -f params.auto.tfvars

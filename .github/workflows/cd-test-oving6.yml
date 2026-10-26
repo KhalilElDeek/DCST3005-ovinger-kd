@@ -1,11 +1,11 @@
-name: CD prod
-run-name: prod ← ${{ inputs.sha }}
+name: CD test (oving6)
+run-name: test ← ${{ inputs.sha }}
 
 on:
   workflow_dispatch:
     inputs:
       sha:
-        description: Hele commit-SHA-en fra en vellykket CD test-kjøring
+        description: Hele commit-SHA-en fra en vellykket CD dev-kjøring
         type: string
         required: true
 
@@ -14,13 +14,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: oving6-prod
+  group: oving6-test
   cancel-in-progress: false
 
 jobs:
   rull-ut:
     runs-on: ubuntu-latest
-    environment: prod
+    environment: test
 
     defaults:
       run:
@@ -51,14 +51,14 @@ jobs:
         run: |
           az keyvault secret show \
             --vault-name "${{ secrets.KEYVAULT_NAME }}" \
-            --name "tfvars-prod" \
+            --name "tfvars-test" \
             --query value -o tsv > params.auto.tfvars
 
       - name: Init
         run: |
           terraform init \
             -backend-config="${{ github.workspace }}/oving6/shared/backend.hcl" \
-            -backend-config="key=env/prod/network.tfstate"
+            -backend-config="key=env/test/oving6-network.tfstate"
 
       - name: Plan
         run: terraform plan -out=tfplan
@@ -67,7 +67,7 @@ jobs:
         run: terraform apply tfplan
 
       - name: Skriv oppsummering
-        run: echo "Rullet ut \`${{ inputs.sha }}\` til prod" >> "$GITHUB_STEP_SUMMARY"
+        run: echo "Rullet ut \`${{ inputs.sha }}\` til test" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Slett parameterfila
         if: always()
