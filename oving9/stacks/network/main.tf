@@ -20,7 +20,7 @@ resource "azurerm_resource_group" "rg" {
 }
 
 module "nett" {
-  source = "../../modules/network"
+  source = "git::https://github.com/KhalilElDeek/DCST3005-ovinger-kd.git//oving9/modules/network?ref=network-v1.0.0"
 
   rg_name   = azurerm_resource_group.rg.name
   location  = var.location
