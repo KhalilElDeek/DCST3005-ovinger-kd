@@ -1,0 +1,67 @@
+name: CD dev (oving9)
+run-name: dev ← ${{ github.sha }}
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'oving9/stacks/network/**'
+      - 'oving9/modules/network/**'
+      - 'oving9/shared/backend.hcl'
+      - '.github/workflows/cd-dev-oving9.yml'
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: oving9-dev
+  cancel-in-progress: false
+
+jobs:
+  rull-ut:
+    runs-on: ubuntu-latest
+    environment: dev
+
+    defaults:
+      run:
+        working-directory: oving9/stacks/network
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - uses: Azure/login@v3.1.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Hent parameterfila fra Key Vault
+        run: |
+          az keyvault secret show \
+            --vault-name "${{ secrets.KEYVAULT_NAME }}" \
+            --name "tfvars-oving9-dev" \
+            --query value -o tsv > params.auto.tfvars
+
+      - name: Init
+        run: |
+          terraform init \
+            -backend-config="${{ github.workspace }}/oving9/shared/backend.hcl" \
+            -backend-config="key=env/dev/oving9-network.tfstate"
+
+      - name: Plan
+        run: terraform plan -out=tfplan
+
+      - name: Apply (lagret plan, ingen auto-approve)
+        run: terraform apply tfplan
+
+      - name: Skriv oppsummering
+        run: echo "Rullet ut \`${{ github.sha }}\` til dev" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Slett parameterfila
+        if: always()
+        run: rm -f params.auto.tfvars
