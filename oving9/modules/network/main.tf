@@ -15,7 +15,7 @@ resource "azurerm_virtual_network" "main" {
   location            = var.location
   resource_group_name = var.rg_name
 
-  tags = var.tags
+  tags = merge(var.tags, { modul = "network" })
 }
 
 resource "azurerm_subnet" "main" {
